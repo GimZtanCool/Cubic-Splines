@@ -133,7 +133,7 @@ def SEL_solver(h, ordered_pairs, boundary_type="natural", fp0=None, fpn=None):
         except ValueError as e:
             print(f"Error al resolver el sistema con LU: {e}")
             return [0.0] * (len(ordered_pairs))
-    elif boundary_type == "clamped":
+    elif boundary_type == "sujeta":
         n = len(ordered_pairs)
         A = get_left_side_matrix_clamped(h)
         b = get_right_side_matrix_clamped(h, ordered_pairs, fp0, fpn)
@@ -164,100 +164,106 @@ def main():
     for i, (x, y) in enumerate(ordered_pairs):
         print(f"P{i+1}: ({x:.2f}, {y:.2f})")
     print("-" * 40)
-
-    # Ask user for boundary type
     while True:
-        boundary_type = input("Tipo de condición de frontera ('natural' o 'clamped'): ").strip().lower()
-        if boundary_type in ("natural", "clamped"):
-            break
-        print("Por favor, ingrese 'natural' o 'clamped'.")
-
-    fp0 = fpn = None
-    if boundary_type == "clamped":
+        # Ask user for boundary type
         while True:
-            try:
-                fp0_input = input("Ingrese la derivada en el extremo izquierdo (f'(x0)) [Enter para aproximar]: ").strip()
-                if fp0_input == "":
-                    fp0 = (y_coords[1] - y_coords[0]) / (x_coords[1] - x_coords[0])
-                    print(f"  Aproximación automática: f'(x0) ≈ {fp0:.4f}")
-                else:
-                    fp0 = float(fp0_input)
-                fpn_input = input("Ingrese la derivada en el extremo derecho (f'(xn)) [Enter para aproximar]: ").strip()
-                if fpn_input == "":
-                    fpn = (y_coords[-1] - y_coords[-2]) / (x_coords[-1] - x_coords[-2])
-                    print(f"  Aproximación automática: f'(xn) ≈ {fpn:.4f}")
-                else:
-                    fpn = float(fpn_input)
+            boundary_type = input("Tipo de condición de frontera ('natural' o 'sujeta'): ").strip().lower()
+            if boundary_type in ("natural", "sujeta"):
                 break
-            except ValueError:
-                print("Por favor, ingrese valores numéricos para las derivadas o deje en blanco para aproximar.")
+            print("Por favor, ingrese 'natural' o 'sujeta'.")
 
-    m = SEL_solver(h, ordered_pairs, boundary_type, fp0, fpn)
+        fp0 = fpn = None
+        if boundary_type == "sujeta":
+            while True:
+                try:
+                    fp0_input = input("Ingrese la derivada en el extremo izquierdo (f'(x0)) [Enter para aproximar]: ").strip()
+                    if fp0_input == "":
+                        fp0 = (y_coords[1] - y_coords[0]) / (x_coords[1] - x_coords[0])
+                        print(f"  Aproximación automática: f'(x0) ≈ {fp0:.4f}")
+                    else:
+                        fp0 = float(fp0_input)
+                    fpn_input = input("Ingrese la derivada en el extremo derecho (f'(xn)) [Enter para aproximar]: ").strip()
+                    if fpn_input == "":
+                        fpn = (y_coords[-1] - y_coords[-2]) / (x_coords[-1] - x_coords[-2])
+                        print(f"  Aproximación automática: f'(xn) ≈ {fpn:.4f}")
+                    else:
+                        fpn = float(fpn_input)
+                    break
+                except ValueError:
+                    print("Por favor, ingrese valores numéricos para las derivadas o deje en blanco para aproximar.")
 
-    print("\n--- Coeficientes de los Polinomios Cúbicos (Procedimiento Detallado para todos los intervalos) ---")
-    for i in range(n - 1):
-        h_i = h[i]
-        y_i = y_coords[i]
-        y_ip1 = y_coords[i + 1]
-        m_i = m[i]
-        m_ip1 = m[i + 1]
-        x_i = x_coords[i]
-        x_ip1 = x_coords[i + 1]
+        m = SEL_solver(h, ordered_pairs, boundary_type, fp0, fpn)
 
-        print(f"Intervalo x ∈ [{x_i:.2f}, {x_ip1:.2f}]:")
-        print(f"  h_{i} = {h_i:.4f}, y_{i} = {y_i:.4f}, y_{i+1} = {y_ip1:.4f}, m_{i} = {m_i:.4f}, m_{i+1} = {m_ip1:.4f}")
+        print("\n--- Coeficientes de los Polinomios Cúbicos (Procedimiento Detallado para todos los intervalos) ---")
+        for i in range(n - 1):
+            h_i = h[i]
+            y_i = y_coords[i]
+            y_ip1 = y_coords[i + 1]
+            m_i = m[i]
+            m_ip1 = m[i + 1]
+            x_i = x_coords[i]
+            x_ip1 = x_coords[i + 1]
 
-        # Cálculo de a_i
-        a_i_num = m_ip1 - m_i
-        a_i_den = 6 * h_i
-        a_i = a_i_num / a_i_den
-        print(f"  a_{i} = (m_{i+1} - m_{i}) / (6 * h_{i}) = ({m_ip1:.4f} - {m_i:.4f}) / (6 * {h_i:.4f}) = {a_i:.4f}")
+            print(f"Intervalo x ∈ [{x_i:.2f}, {x_ip1:.2f}]:")
+            print(f"  h_{i} = {h_i:.4f}, y_{i} = {y_i:.4f}, y_{i+1} = {y_ip1:.4f}, m_{i} = {m_i:.4f}, m_{i+1} = {m_ip1:.4f}")
 
-        # Cálculo de b_i
-        b_i = m_i / 2
-        print(f"  b_{i} = m_{i} / 2 = {m_i:.4f} / 2 = {b_i:.4f}")
+            # Cálculo de a_i
+            a_i_num = m_ip1 - m_i
+            a_i_den = 6 * h_i
+            a_i = a_i_num / a_i_den
+            print(f"  a_{i} = (m_{i+1} - m_{i}) / (6 * h_{i}) = ({m_ip1:.4f} - {m_i:.4f}) / (6 * {h_i:.4f}) = {a_i:.4f}")
 
-        # Cálculo de c_i
-        c_i_term1 = (y_ip1 - y_i) / h_i
-        c_i_term2 = h_i * (m_ip1 + 2 * m_i) / 6
-        c_i = c_i_term1 - c_i_term2
-        print(f"  c_{i} = (y_{i+1} - y_{i}) / h_{i} - h_{i} * (m_{i+1} + 2 * m_{i}) / 6")
-        print(f"    = ({y_ip1:.4f} - {y_i:.4f}) / {h_i:.4f} - {h_i:.4f} * ({m_ip1:.4f} + 2 * {m_i:.4f}) / 6 = {c_i:.4f}")
+            # Cálculo de b_i
+            b_i = m_i / 2
+            print(f"  b_{i} = m_{i} / 2 = {m_i:.4f} / 2 = {b_i:.4f}")
 
-        # Cálculo de d_i
-        d_i = y_i
-        print(f"  d_{i} = y_{i} = {d_i:.4f}")
+            # Cálculo de c_i
+            c_i_term1 = (y_ip1 - y_i) / h_i
+            c_i_term2 = h_i * (m_ip1 + 2 * m_i) / 6
+            c_i = c_i_term1 - c_i_term2
+            print(f"  c_{i} = (y_{i+1} - y_{i}) / h_{i} - h_{i} * (m_{i+1} + 2 * m_{i}) / 6")
+            print(f"    = ({y_ip1:.4f} - {y_i:.4f}) / {h_i:.4f} - {h_i:.4f} * ({m_ip1:.4f} + 2 * {m_i:.4f}) / 6 = {c_i:.4f}")
 
-        print(f"  S_{i}(x) = {a_i:.4f}(x - {x_i:.4f})^3 + {b_i:.4f}(x - {x_i:.4f})^2 + {c_i:.4f}(x - {x_i:.4f}) + {d_i:.4f}")
-        print("-" * 40)
+            # Cálculo de d_i
+            d_i = y_i
+            print(f"  d_{i} = y_{i} = {d_i:.4f}")
 
-    # --- Visualización con Matplotlib ---
-    plt.figure(figsize=(10, 6))
-    plt.scatter(x_coords, y_coords, color='red', marker='o', label='Puntos de Interpolación')
+            print(f"  S_{i}(x) = {a_i:.4f}(x - {x_i:.4f})^3 + {b_i:.4f}(x - {x_i:.4f})^2 + {c_i:.4f}(x - {x_i:.4f}) + {d_i:.4f}")
+            print("-" * 40)
 
-    x_fine = np.linspace(min(x_coords), max(x_coords), 1000)
-    for i in range(n - 1):
-        start_x = x_coords[i]
-        end_x = x_coords[i + 1]
-        x_interval = np.linspace(start_x, end_x, 200)
-        h_i = h[i]
-        y_i = y_coords[i]
-        y_ip1 = y_coords[i + 1]
-        m_i = m[i]
-        m_ip1 = m[i + 1]
-        a_i = (m_ip1 - m_i) / (6 * h_i)
-        b_i = m_i / 2
-        c_i = (y_ip1 - y_i) / h_i - h_i * (m_ip1 + 2 * m_i) / 6
-        d_i = y_i
-        y_interval = a_i * (x_interval - start_x)**3 + b_i * (x_interval - start_x)**2 + c_i * (x_interval - start_x) + d_i
-        plt.plot(x_interval, y_interval, label=f'S_{i}(x)' if i == 0 else "", linewidth=2)
+        # --- Visualización con Matplotlib ---
+        plt.figure(figsize=(10, 6))
+        plt.scatter(x_coords, y_coords, color='red', marker='o', label='Puntos de Interpolación')
 
-    plt.xlabel('x')
-    plt.ylabel('y')
-    plt.title('Interpolación con Splines Cúbicos (Factorización LU)')
-    plt.legend()
-    plt.grid(True)
-    plt.show()
+        x_fine = np.linspace(min(x_coords), max(x_coords), 1000)
+        for i in range(n - 1):
+            start_x = x_coords[i]
+            end_x = x_coords[i + 1]
+            x_interval = np.linspace(start_x, end_x, 200)
+            h_i = h[i]
+            y_i = y_coords[i]
+            y_ip1 = y_coords[i + 1]
+            m_i = m[i]
+            m_ip1 = m[i + 1]
+            a_i = (m_ip1 - m_i) / (6 * h_i)
+            b_i = m_i / 2
+            c_i = (y_ip1 - y_i) / h_i - h_i * (m_ip1 + 2 * m_i) / 6
+            d_i = y_i
+            y_interval = a_i * (x_interval - start_x)**3 + b_i * (x_interval - start_x)**2 + c_i * (x_interval - start_x) + d_i
+            plt.plot(x_interval, y_interval, label=f'S_{i}(x)' if i == 0 else "", linewidth=2)
+
+        plt.xlabel('x')
+        plt.ylabel('y')
+        plt.title('Interpolación con Splines Cúbicos (Factorización LU)')
+        plt.suptitle('Condición de frontera: ' + boundary_type.capitalize(), fontsize=10, y=0.96)
+        plt.axhline(0, color='black', linewidth=0.5, linestyle='--')
+        plt.legend()
+        plt.grid(True)
+        plt.show(block=False)
+
+        salir = input("¿Desea salir? (s/n): ").strip().lower()
+        if salir == 's':
+            break
 
 if __name__ == "__main__":
     main()
