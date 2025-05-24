@@ -22,12 +22,8 @@ def generate_ordered_pairs(n):
 def get_h(ordered_pairs):
     h = [ordered_pairs[i+1][0] - ordered_pairs[i][0] for i in range(len(ordered_pairs) - 1)]
     return h
-#def natural_boundary():
 
-#def clamped_boundary():
-
-
-def get_left_side_matrix(h):
+def get_left_side_matrix_natural(h):
     n = len(h) + 1
     if n < 3:
         return []
@@ -41,7 +37,7 @@ def get_left_side_matrix(h):
             left_side_matrix[i][i + 1] = h[i + 1]
     return left_side_matrix
 
-def get_right_side_matrix(h, ordered_pairs):
+def get_right_side_matrix_natural(h, ordered_pairs):
     n = len(ordered_pairs)
     if n < 3:
         return []
@@ -51,6 +47,38 @@ def get_right_side_matrix(h, ordered_pairs):
         term2 = (ordered_pairs[i + 1][1] - ordered_pairs[i][1]) / h[i]
         right_side[i] = 3 * (term1 - term2)
     return right_side
+
+# Clamped boundary matrix and right side
+
+def get_left_side_matrix_clamped(h):
+    n = len(h) + 1
+    A = [[0.0 for _ in range(n)] for _ in range(n)]
+    # First row (clamped left)
+    A[0][0] = 2 * h[0]
+    A[0][1] = h[0]
+    # Last row (clamped right)
+    A[-1][-2] = h[-1]
+    A[-1][-1] = 2 * h[-1]
+    # Interior rows
+    for i in range(1, n - 1):
+        A[i][i - 1] = h[i - 1]
+        A[i][i] = 2 * (h[i - 1] + h[i])
+        A[i][i + 1] = h[i]
+    return A
+
+def get_right_side_matrix_clamped(h, ordered_pairs, fp0, fpn):
+    n = len(ordered_pairs)
+    b = [0.0 for _ in range(n)]
+    # First row (clamped left)
+    b[0] = 3 * ((ordered_pairs[1][1] - ordered_pairs[0][1]) / h[0] - fp0)
+    # Last row (clamped right)
+    b[-1] = 3 * (fpn - (ordered_pairs[-1][1] - ordered_pairs[-2][1]) / h[-1])
+    # Interior rows
+    for i in range(1, n - 1):
+        term1 = (ordered_pairs[i + 1][1] - ordered_pairs[i][1]) / h[i]
+        term2 = (ordered_pairs[i][1] - ordered_pairs[i - 1][1]) / h[i - 1]
+        b[i] = 3 * (term1 - term2)
+    return b
 
 def lu_factorization(A):
     n = len(A)
@@ -91,21 +119,35 @@ def lu_solve(L, U, b):
 
     return x
 
-def SEL_solver(h, ordered_pairs):
-    A = get_left_side_matrix(h)
-    b = get_right_side_matrix(h, ordered_pairs)
-    n_eq = len(b)
-
-    if not A or not b or len(A) != n_eq or len(A[0]) != n_eq:
-        return [0.0] * (len(ordered_pairs)) # Handle edge cases
-
-    try:
-        L, U = lu_factorization(A)
-        m_interior = lu_solve(L, U, b)
-        return [0.0] + m_interior + [0.0] # Natural spline: m_0 = m_{n-1} = 0
-    except ValueError as e:
-        print(f"Error al resolver el sistema con LU: {e}")
-        return [0.0] * (len(ordered_pairs))
+def SEL_solver(h, ordered_pairs, boundary_type="natural", fp0=None, fpn=None):
+    if boundary_type == "natural":
+        A = get_left_side_matrix_natural(h)
+        b = get_right_side_matrix_natural(h, ordered_pairs)
+        n_eq = len(b)
+        if not A or not b or len(A) != n_eq or len(A[0]) != n_eq:
+            return [0.0] * (len(ordered_pairs))
+        try:
+            L, U = lu_factorization(A)
+            m_interior = lu_solve(L, U, b)
+            return [0.0] + m_interior + [0.0]
+        except ValueError as e:
+            print(f"Error al resolver el sistema con LU: {e}")
+            return [0.0] * (len(ordered_pairs))
+    elif boundary_type == "clamped":
+        n = len(ordered_pairs)
+        A = get_left_side_matrix_clamped(h)
+        b = get_right_side_matrix_clamped(h, ordered_pairs, fp0, fpn)
+        if not A or not b or len(A) != n or len(A[0]) != n:
+            return [0.0] * n
+        try:
+            L, U = lu_factorization(A)
+            m = lu_solve(L, U, b)
+            return m
+        except ValueError as e:
+            print(f"Error al resolver el sistema con LU: {e}")
+            return [0.0] * n
+    else:
+        raise ValueError("Tipo de condición de frontera no soportada")
 
 def main():
     print("-" * 40)
@@ -123,7 +165,34 @@ def main():
         print(f"P{i+1}: ({x:.2f}, {y:.2f})")
     print("-" * 40)
 
-    m = SEL_solver(h, ordered_pairs)
+    # Ask user for boundary type
+    while True:
+        boundary_type = input("Tipo de condición de frontera ('natural' o 'clamped'): ").strip().lower()
+        if boundary_type in ("natural", "clamped"):
+            break
+        print("Por favor, ingrese 'natural' o 'clamped'.")
+
+    fp0 = fpn = None
+    if boundary_type == "clamped":
+        while True:
+            try:
+                fp0_input = input("Ingrese la derivada en el extremo izquierdo (f'(x0)) [Enter para aproximar]: ").strip()
+                if fp0_input == "":
+                    fp0 = (y_coords[1] - y_coords[0]) / (x_coords[1] - x_coords[0])
+                    print(f"  Aproximación automática: f'(x0) ≈ {fp0:.4f}")
+                else:
+                    fp0 = float(fp0_input)
+                fpn_input = input("Ingrese la derivada en el extremo derecho (f'(xn)) [Enter para aproximar]: ").strip()
+                if fpn_input == "":
+                    fpn = (y_coords[-1] - y_coords[-2]) / (x_coords[-1] - x_coords[-2])
+                    print(f"  Aproximación automática: f'(xn) ≈ {fpn:.4f}")
+                else:
+                    fpn = float(fpn_input)
+                break
+            except ValueError:
+                print("Por favor, ingrese valores numéricos para las derivadas o deje en blanco para aproximar.")
+
+    m = SEL_solver(h, ordered_pairs, boundary_type, fp0, fpn)
 
     print("\n--- Coeficientes de los Polinomios Cúbicos (Procedimiento Detallado para todos los intervalos) ---")
     for i in range(n - 1):
