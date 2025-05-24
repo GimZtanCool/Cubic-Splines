@@ -22,9 +22,9 @@ def generate_ordered_pairs(n):
 def get_h(ordered_pairs):
     h = [ordered_pairs[i+1][0] - ordered_pairs[i][0] for i in range(len(ordered_pairs) - 1)]
     return h
-def natural_boundary():
+#def natural_boundary():
 
-def clamped_boundary():
+#def clamped_boundary():
 
 
 def get_left_side_matrix(h):
